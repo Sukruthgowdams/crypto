@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTH Death Token Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@latest/lib/index.iife.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="glitch-wrapper">
+            <h1 class="glitch" data-text="DTH Death Token Manager">DTH Death Token Manager</h1>
+        </div>
+        <div class="neon-border">
+            <button id="connectWalletButton" class="cyberpunk-button">Connect Phantom / Soleflare Wallet</button>
+            
+            <div id="walletInfo" class="wallet-info" style="display: none;">
+                <p class="info-label">Wallet Address: <span id="walletAddress" class="info-value"></span></p>
+                <p class="info-label">Balance: <span id="tokenBalance" class="info-value">0</span> DTH</p>
+            </div>
+
+            <!-- Add a form for token transfer -->
+            <div id="transferForm" class="transfer-form" style="display: none;">
+                <h2>Transfer DTH Tokens</h2>
+                <form id="transferTokenForm">
+                    <label for="recipientAddress">Recipient Address:</label>
+                    <input type="text" id="recipientAddress" name="recipientAddress" required>
+                    <label for="amount">Amount:</label>
+                    <input type="number" id="amount" name="amount" required>
+                    <button type="submit" class="cyberpunk-button">Transfer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="/dist/bundle.js"></script>
+</body>
+</html>
