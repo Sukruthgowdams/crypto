@@ -1,5 +1,11 @@
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createTransferInstruction } from '@solana/spl-token';
-import * as solanaWeb3 from '@solana/web3.js';
+import { 
+    getAssociatedTokenAddress, 
+    createAssociatedTokenAccountInstruction,
+    createTransferCheckedInstruction,
+    TOKEN_2022_PROGRAM_ID 
+  } from '@solana/spl-token';
+  import * as solanaWeb3 from '@solana/web3.js';
+
 
 document.addEventListener("DOMContentLoaded", () => {
     const connectWalletButton = document.getElementById('connectWalletButton');
@@ -12,8 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let connection;
     let walletAddress;
     let walletPublicKey;
-    const mintAddress = new solanaWeb3.PublicKey('mntWh1FASwFZt7pqq1XvW8pyXph48WG3JLtTgkWFaYZ'); // Replace with correct mint address
-
+ const mintAddress = new solanaWeb3.PublicKey('mntWh1FASwFZt7pqq1XvW8pyXph48WG3JLtTgkWFaYZ');
     // Check if Phantom or Solflare Wallet is installed
     const isPhantomInstalled = window.solana && window.solana.isPhantom;
     const isSolflareInstalled = window.solflare && window.solflare.isSolflare;
@@ -78,56 +83,82 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Handle token transfer
     transferTokenForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
+    event.preventDefault();
 
-        const recipientAddress = document.getElementById('recipientAddress').value;
-        const amount = parseFloat(document.getElementById('amount').value); // Parse amount as a float
+    const recipientAddress = document.getElementById('recipientAddress').value;
+    const amount = parseFloat(document.getElementById('amount').value);
 
-        try {
-            const recipientPublicKey = new solanaWeb3.PublicKey(recipientAddress);
+    try {
+        const recipientPublicKey = new solanaWeb3.PublicKey(recipientAddress);
 
-            // Get the associated token accounts for sender and recipient
-            const fromTokenAccount = await getAssociatedTokenAddress(mintAddress, walletPublicKey);
-            const toTokenAccount = await getAssociatedTokenAddress(mintAddress, recipientPublicKey);
+        // Get associated token accounts
+        const fromTokenAccount = await getAssociatedTokenAddress(
+            mintAddress,
+            walletPublicKey,
+            undefined,
+            TOKEN_2022_PROGRAM_ID
+        );
 
-            // Convert the amount to the smallest unit (lamports for tokens with 9 decimals)
-            const amountInSmallestUnit = Math.round(amount * 1_000_000_000); // Multiply by 1 billion for 9 decimals
+        const toTokenAccount = await getAssociatedTokenAddress(
+            mintAddress,
+            recipientPublicKey,
+            undefined,
+            TOKEN_2022_PROGRAM_ID
+        );
 
-            // Create a transfer instruction for SPL tokens
-            const transferInstruction = createTransferInstruction(
-                fromTokenAccount, // Source token account
-                toTokenAccount,   // Destination token account
-                walletPublicKey,  // Owner of the source token account
-                amountInSmallestUnit, // Amount in the smallest unit (e.g., lamports for 9 decimals)
-                [], // No multisig signers
-                TOKEN_PROGRAM_ID // SPL Token Program ID
-            );
+        // Convert amount to smallest units (assuming 9 decimals)
+        const amountInSmallestUnit = BigInt(Math.floor(amount * 10**9));
 
-            // Create and sign the transaction
-            const transaction = new solanaWeb3.Transaction().add(transferInstruction);
+        // Create transfer checked instruction for Token 2022
+        const transferInstruction = createTransferCheckedInstruction(
+            fromTokenAccount,
+            mintAddress,
+            toTokenAccount,
+            walletPublicKey,
+            amountInSmallestUnit,
+            9, // Decimals
+            [],
+            TOKEN_2022_PROGRAM_ID
+        );
 
-            const { blockhash } = await connection.getRecentBlockhash();
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = walletPublicKey;
+        // Add priority fee
+        const computeUnits = 400_000;
+        const microLamports = 50_000;
+        
+        const priorityFeeInstruction = solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports
+        });
 
-            // Sign the transaction
-            let signedTransaction;
-            if (isPhantomInstalled) {
-                signedTransaction = await window.solana.signTransaction(transaction);
-            } else if (isSolflareInstalled) {
-                signedTransaction = await window.solflare.signTransaction(transaction);
-            } else {
-                throw new Error("No wallet provider found.");
-            }
+        // Build transaction
+        const transaction = new solanaWeb3.Transaction()
+            .add(priorityFeeInstruction)
+            .add(transferInstruction);
 
-            // Send the transaction
-            const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        const { blockhash } = await connection.getRecentBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = walletPublicKey;
 
-            console.log("✅ Transaction sent with signature:", signature);
-            alert("Transaction sent successfully!");
-        } catch (err) {
-            console.error('❌ Error transferring tokens:', err);
-            alert("Error transferring tokens: " + err.message);
+        // Sign and send transaction
+        let signedTransaction;
+        if (isPhantomInstalled) {
+            signedTransaction = await window.solana.signTransaction(transaction);
+        } else if (isSolflareInstalled) {
+            signedTransaction = await window.solflare.signTransaction(transaction);
         }
-    });
+
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        await connection.confirmTransaction(signature);
+
+        console.log("✅ Transaction confirmed:", signature);
+        alert(`Transaction successful! Signature: ${signature}`);
+        
+        // Refresh balance
+        await getBalance(walletAddress, connection);
+
+    } catch (err) {
+        console.error('❌ Error:', err);
+        alert(`Transaction failed: ${err.message}`);
+    }
+});
+
 });
